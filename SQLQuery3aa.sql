@@ -1,0 +1,2 @@
+USE SSASLOGGING
+SELECT * FROM dbo.OlapQueryLog

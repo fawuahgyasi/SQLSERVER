@@ -1,0 +1,303 @@
+/*
+
+[DimProduct].[Product Category].Members--All members
+[DimProduct].[Product Category].[Bikes] --- actual values
+[DimProduct].[Product Category].&1 Key Value. 
+
+
+*/
+
+SELECT 
+	NON EMPTY [Product].[Product Category].Members on Rows,
+	NON EMPTY(
+	---Tuple: Members from different Dimension. 
+	[Order Date].[Calendar Year].Members,
+	[Measures].[FRSSales Amount]
+	) on Columns
+	
+FROM [SalesCube]---Cube
+
+
+--
+;
+SELECT 
+	NON EMPTY 
+	[Product].[Product Category].[Product Category] on Rows,
+	NON EMPTY(
+	---Tuple: Members from different Dimension. 
+	[Order Date].[Calendar Year].[Calendar Year],
+	[Measures].[FRSSales Amount]
+	) on Columns
+	
+FROM [SalesCube]---Cube
+
+
+--SETS ARE MULITPLE MEMBERS FROM THE SAME DIMENSION AND SAME HIERACHY
+--SETS ARE ENCLOSED IN CURLY BRACES
+/*
+
+{
+	[DimProduct].[Product Category].[Bikes],
+	[DimProduct].[Product Category].[Components]
+}
+{
+	(
+	  [DimProduct].[Product Category].[Bikes],
+	  [SalesTerritory].[Sales Country].&[United States]
+     ),
+	  (
+	   [DimProduct][Product Category].[Components],
+	   [SalesTerritory].[Sales Country].&[Australia]
+       )
+ 
+*/
+;
+SELECT
+
+{[Measures].[FRSSales Amount],
+ [Measures].[FRSTax Amt] 
+ } ON COLUMNS,
+
+{
+	(
+	  [Product].[Product Category].[Bikes],
+	  [Sales Territory].[SalesCountry].&[United States]
+     ),
+	  (
+	   [Product].[Product Category].[Components],
+	   [Sales Territory].[SalesCountry].&[Australia]
+       )
+       
+} ON ROWS
+FROM [SalesCube]
+
+--There are total 128 Axes for MDX
+--The first five axis have name
+/*
+Columns	0
+Rows	1
+Pages	2
+Section	3
+Chapter	4
+---------128
+*/
+
+
+
+---Hierachies
+
+SELECT 
+{
+ [Measures].[FRSSales Amount],
+ [Measures].[FRSTax Amt]
+} ON COLUMNS,
+NON EMPTY
+{[Reseller].[Country Region].[Country Region]
+ 
+ } ON ROWS
+ FROM [ResellerSales]
+ WHERE ([Order Date].[Calendar Year].&[2008])
+
+
+---Calculated Members
+/*
+Calculations performed on the mulitple members of dimension
+and provides zero or single member as result
+*/
+WITH MEMBER [FRStoalAmount]
+AS
+[Measures].[FRSSales Amount]+
+ [Measures].[FRSTax Amt]
+SELECT 
+{
+ [Measures].[FRSSales Amount],
+ [Measures].[FRSTax Amt],[FRStoalAmount]
+} ON COLUMNS,
+NON EMPTY
+([Reseller].[Reseller].[Reseller],
+ [Product].[Product Category].[Product Category]
+ )
+  ON ROWS
+ FROM [SalesCube]
+ WHERE ([Order Date].[Calendar Year].&[2008])
+ 
+ 
+ --DISPLAY total sales : Inter
+ 
+ WITH MEMBER [TotalSales]
+ AS
+ [Measures].[FISSales Amount] + [Measures].[FRSSales Amount]
+ 
+ SELECT 
+ ( 
+ [Order Date].[Calendar Year].[Calendar Year],
+ {
+    [Measures].[FRSSales Amount],
+    [Measures].[FRSSales Amount],
+    [TotalSales]
+    }--,--,
+ )
+ ON COLUMNS,
+ [Product].[Product Category].[Product Category] ON ROWS
+ FROM [SalesCube]
+ WHERE [Sales Territory].[SalesCountry].&[United States]
+ 
+ 
+ WITH SET [TopeSellingProducts]
+ AS
+ TOPCOUNT([Product].[Product].[Product],25,[Measures].[FRSSales Amount])
+ 
+ SELECT
+ {[Measures].[FRSSales Amount],
+ [Measures].[FRSOrder Quantity],
+ [Measures].[FRSTax Amt]
+ } ON 0,
+ [TopeSellingProducts] on 1
+ FROM [SalesCube]
+ 
+ 
+ ---USING IS AS A FILTER 
+ 
+ WITH SET [TopeSellingProducts]
+ AS
+ TOPCOUNT([Product].[Product].[Product],25,[Measures].[FRSSales Amount])
+ 
+ SELECT
+ {[Measures].[FRSSales Amount],
+ [Measures].[FRSOrder Quantity],
+ [Measures].[FRSTax Amt]
+ } ON 0,
+ [TopeSellingProducts] on 1
+ FROM [SalesCube]
+ WHERE ([TopeSellingProducts])
+ 
+ 
+ 
+ ---Functions related to Hierachies
+ /*
+ To get grandchildren infomation or to navigate to different levels in a hierachy */
+
+ */
+ 
+ SELECT 
+ {
+	[Measures].[FRSOrder Quantity],
+	 [Measures].[FRSSales Amount]}
+	 ON 0,
+	 NON EMPTY (
+		DESCENDANTS(
+					[Order Date].[Calendar Year].&[2005],2))
+	ON ROWS
+	FROM 
+ 
+ [SalesCube]
+ 
+ ---self,self_and_after,self_and_before,before,after
+ --ancestors is the opppossite to decendants function. 
+SELECT 
+ {
+	[Measures].[FRSOrder Quantity],
+	 [Measures].[FRSSales Amount]}
+	 ON 0,
+	 NON EMPTY (
+		ancestors([Order Date].[Calendar].[Month Name].&[September 2006],2))
+	ON ROWS
+	FROM  [SalesCube] 
+ 
+ 
+ --SIBLIINGS
+ SELECT 
+ {
+	[Measures].[FRSOrder Quantity],
+	 [Measures].[FRSSales Amount]}
+	 ON 0,
+	 NON EMPTY (
+	([Order Date].[Calendar].[Month Name].&[September 2006].siblings))
+	ON ROWS
+	FROM  [SalesCube] 
+	
+	
+--Order function: Similar to order by 
+
+SELECT
+{
+	[Measures].[FRSSales Amount],[Measures].[FRSOrder Quantity]}
+	
+	ON 0,
+	
+	(ORDER ([Product].[Product].[Product],
+	        [Measures].[FRSSales Amount],DESC),
+	        [Product].[Color].[Color]) ON ROWS
+	        FROM [SalesCube]
+	        
+---FILTER FUNCTION. 
+SELECT 
+{[Measures].[FRSSales Amount], [Measures].[FRSTax Amt] } on 0,
+non empty (filter ([Product].[Product].[Product],[Measures].[FRSTax Amt]> 1500
+AND [Measures].[FRSTax Amt] <5000)) ON ROWS
+FROM [SalesCube]
+
+----------------------
+--Retrieve the Total sales and tax amounts for all the projducts that belon to the components category
+
+SELECT 
+{[Measures].[FRSSales Amount],[Measures].[FRSTax Amt]} on 0,
+non empty
+(filter
+(([Product].[Product Category].[Product Category],
+         [Product].[Product].[Product]),
+         [Product].[Product Category].Currentmember IS
+         [Product].[Product Category].&[2]))  ON ROWS
+         FROM [SalesCube]
+                        
+
+/*
+Time Functions
+
+                YTD, MTD, QTD
+
+                PARALLELPERIOD
+
+                PERIODSTODATE
+
+Value Functions
+
+                ISEMPTY
+
+                IIF
+
+Statistical Functions
+
+                AGGREGATE
+
+                DISTINCTCOUNT *
+
+                RANK
+
+Set Functions
+
+                TOPCOUNT        
+
+                BOTTOMCOUNT
+
+                TOPNPERCENT
+
+                BOTTOMNPERCENT
+
+                HEAD
+
+                TAIL
+
+                LEAD
+
+                LAG
+
+                EXCEPT
+
+                UNION
+
+
+*/  
+   MTD( [«Member»] )       
+   YTD( [«Member»] )
+   QTD( [«Member»] )    
